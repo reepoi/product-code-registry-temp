@@ -27,47 +27,103 @@ def field(openapi_type, ob_item_type, **kwargs):
     )
 
 
-def Decimals_field():
-    return models.IntegerField()
+def Decimals(name):
+    return 'Decimals', models.IntegerField(f'{name} Decimals')
 
 
-def EndTime_field():
-    return models.CharField(max_length=TIME_STR_LEN)
+def EndTime(name):
+    return 'EndTime', models.CharField(f'{name} EndTime', max_length=TIME_STR_LEN)
 
 
-def Precision_field():
-    return models.IntegerField()
+def Precision(name):
+    return 'Precision', models.IntegerField(f'{name} Precision')
 
 
-def StartTime_field():
-    return models.CharField(max_length=TIME_STR_LEN)
+def StartTime(name):
+    return 'StartTime', models.CharField(f'{name} StartTime', max_length=TIME_STR_LEN)
 
 
-def Unit_field(max_length=STR_LEN):
-    return models.CharField(max_length=max_length)
+def Unit(name, max_length=STR_LEN):
+    return 'Unit', models.CharField(f'{name} Unit', max_length=max_length)
 
 
-def Value_field(max_length=STR_LEN):
-    return models.CharField(max_length=max_length)
+def Value(name, max_length=STR_LEN):
+    return 'Value', models.CharField(f'{name} Value', max_length=max_length)
 
 
-def add_model_fields(m):
-    for fname, v in m.field_metadata.items():
+def TaxonomyElement(name):
+    return [EndTime(name), StartTime(name)]
+
+
+def TaxonomyElementBoolean(name):
+    fields = TaxonomyElement(name)
+    fields.append(Value(name))
+    return fields
+
+
+def TaxonomyElementInteger(name, ob_item_type: obit.ItemTypeUnit):
+    fields = [Value(name)]
+    if len(ob_item_type.units) > 0:
+        max_length = max(len(u.id) for u in ob_item_type.units)
+        fields.append(Unit(name, max_length=max_length))
+    return TaxonomyElement(name)
+
+
+def TaxonomyElementNumber(name, ob_item_type: obit.ItemTypeUnit):
+    fields = TaxonomyElement(name)
+    fields.append(Value(name))
+    if len(ob_item_type.units) > 0:
+        max_length = max(len(u.id) for u in ob_item_type.units)
+        fields.append(Unit(name, max_length=max_length))
+    return fields
+
+
+def TaxonomyElementString(name, ob_item_type: obit.ItemTypeEnum):
+    fields = TaxonomyElement(name)
+    if ob_item_type.__class__ is obit.ItemType:
+        max_length = STR_LEN
+    else:
+        max_length = max(len(u.id) for u in ob_item_type.enums)
+    fields.append(Value(name, max_length=max_length))
+    return fields
+
+
+def add_model_fields(attrs):
+    field_metadata = attrs['field_metadata']
+    for fname, v in field_metadata.items():
         openapi_type, ob_item_type = v['openapi_type'], v['ob_item_type']
-        for p, f in zip(['Decimals', 'EndTime', 'Precision', 'StartTime', 'Unit', 'Value'], [Decimals_field, EndTime_field, Precision_field, StartTime_field, Unit_field, Value_field]):
-            setattr(m, f'{fname}_{p}', f())
+        match openapi_type:
+            case OpenAPIType.BOOLEAN:
+                fields = TaxonomyElementBoolean(fname, ob_item_type)
+            case OpenAPIType.INTEGER:
+                fields = TaxonomyElementInteger(fname, ob_item_type)
+            case OpenAPIType.NUMBER:
+                fields = TaxonomyElementNumber(fname, ob_item_type)
+            case OpenAPIType.STRING:
+                fields = TaxonomyElementString(fname, ob_item_type)
+        for f in fields:
+            primitive, field = f
+            attrs[f'{fname}_{primitive}'] = field
 
 
-class Product(models.Model):
+class ModelBase(models.base.ModelBase):
+    def __new__(cls, name, bases, attrs, **kwargs):
+        import pdb
+        pdb.set_trace()
+        add_model_fields(attrs)
+        return super().__new__(cls, name, bases, attrs, **kwargs)
+
+
+class Product(models.Model, metaclass=ModelBase):
     field_metadata = {
-        'Description': field(OpenAPIType.STRING, 'StringItemType', max_length=STR_LEN),
-        'FileFolderURL': field(OpenAPIType.STRING, 'StringItemType', max_length=URL_LEN),
+        'Description': field(OpenAPIType.STRING, 'StringItemType'),
+        'FileFolderURL': field(OpenAPIType.STRING, 'StringItemType'),
+        'ProdCode': field(OpenAPIType.STRING, 'StringItemType'),
+        'ProdDatasheet': field(OpenAPIType.STRING, 'StringItemType'),
+        'ProdMfr': field(OpenAPIType.STRING, 'StringItemType'),
+        'ProdName': field(OpenAPIType.STRING, 'StringItemType'),
+        'ProdType': field(OpenAPIType.STRING, 'ProdTypeItemType'),
     }
 
     class Meta:
-        abstract = True
-
-
-all_models = [Product]
-for m in all_models:
-    add_model_fields(m)
+        abstract = False
