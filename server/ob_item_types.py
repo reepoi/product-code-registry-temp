@@ -47,11 +47,11 @@ def load_ob_taxonomy():
 
 def json_to_item_type(name: str, ob_taxonomy: dict):
     it = ob_taxonomy['x-ob-item-types'][name]
-    get_item_type_values = lambda key: tuple(val_class(id, v['label'], v['description'])
-                                             for id, v in it[key].items())
+    get_item_type_values = lambda key, val_class: tuple(val_class(id, v['label'], v['description'])
+                                                        for id, v in it[key].items())
     if 'enums' in it:
-        return ItemTypeEnum(name, it['description'], get_item_type_values('enums'))
+        return ItemTypeEnum(name, it['description'], get_item_type_values('enums', Enum))
     elif 'units' in it:
-        return ItemTypeUnit(name, it['description'], get_item_type_values('units'))
+        return ItemTypeUnit(name, it['description'], get_item_type_values('units', Unit))
     else:
         return ItemType(name, it['description'])
