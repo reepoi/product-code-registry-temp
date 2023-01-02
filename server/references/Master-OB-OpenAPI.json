@@ -7226,18 +7226,6 @@
               "ProdCell": {
                 "$ref": "#/components/schemas/ProdCell"
               },
-              "ProdCode": {
-                "$ref": "#/components/schemas/ProdCode"
-              },
-              "Description": {
-                "$ref": "#/components/schemas/Description"
-              },
-              "FileFolderURL": {
-                "$ref": "#/components/schemas/FileFolderURL"
-              },
-              "ProdDatasheet": {
-                "$ref": "#/components/schemas/ProdDatasheet"
-              },
               "ProdGlazing": {
                 "$ref": "#/components/schemas/ProdGlazing"
               },
@@ -7252,9 +7240,6 @@
               },
               "CableConnector": {
                 "$ref": "#/components/schemas/CableConnector"
-              },
-              "Dimension": {
-                "$ref": "#/components/schemas/Dimension"
               },
               "PowerToleranceMin": {
                 "$ref": "#/components/schemas/PowerToleranceMin"
@@ -7292,9 +7277,6 @@
               "ShadeResponse": {
                 "$ref": "#/components/schemas/ShadeResponse"
               },
-              "Warranties": {
-                "$ref": "#/components/schemas/Warranties"
-              },
               "CECNotes": {
                 "$ref": "#/components/schemas/CECNotes"
               },
@@ -7329,15 +7311,6 @@
             "type": "object",
             "description": "A subcomponent of a ProdModule",
             "properties": {
-              "Description": {
-                "$ref": "#/components/schemas/Description"
-              },
-              "FileFolderURL": {
-                "$ref": "#/components/schemas/FileFolderURL"
-              },
-              "ProdCode": {
-                "$ref": "#/components/schemas/ProdCode"
-              },
               "CellColor": {
                 "$ref": "#/components/schemas/CellColor"
               },

@@ -73,7 +73,47 @@ class DCOutput(Model):
     pass
 
 
-class ProdBattery(Model):
+class ProdBattery(Product):
+    pass
+
+
+class ProdCell(Product):
+    pass
+
+
+class ProdCombiner(Product):
+    pass
+
+
+class ProdEnergyStorageSystem(Product):
+    pass
+
+
+class InverterEfficiency(Model):
+    pass
+
+
+class ProdMeter(Product):
+    pass
+
+
+class ProdGlazing(Model):
+    pass
+
+
+class ProdModule(Product):
+    pass
+
+
+class ModuleElectRating(Model):
+    pass
+
+
+class ProdOptimizer(Product):
+    pass
+
+
+class ProdWire(Product):
     pass
 
 
@@ -121,3 +161,37 @@ class Contact(Model):
 
 class Firmware(Model):
     pass
+
+
+class PowerDCPeak(Model):
+    pass
+
+
+class FrequencyAC(Model):
+    ob_elements = dict(
+        FrequencyAC=obit.OBElement('FrequencyAC'),
+    )
+    ob_objects = tuple()
+
+
+class InverterEfficiencyCECTestResult(Model):
+    pass
+
+
+class ACInput(Model):
+    pass
+
+
+class ACOutput(Model):
+    pass
+
+
+class PowerACSurge(Model):
+    pass
+
+
+class ProdName(Model):
+    ob_elements = dict(
+        ProdName=obit.OBElement('ProdName'),
+    )
+    ob_objects = tuple()
