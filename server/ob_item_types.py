@@ -79,11 +79,11 @@ class OBElement:
 
     def __init__(self, name, **Value_opts):
         allOf = OB_TAXONOMY['components']['schemas'][name]
-        superclass_ref, details = allOf['allOf']
+        details = allOf['allOf'][1]
 
         self.name = name
         self.description = details['description']
-        self.superclass = TaxonomyElement(superclass_ref['$ref'].split('/')[-1])
+        self.superclass = TaxonomyElement(get_schema_superclass(allOf))
         self.item_type = json_to_item_type(details['x-ob-item-type'], OB_TAXONOMY)
         self.item_type_group = json_to_item_type_group(details['x-ob-item-type-group'], OB_TAXONOMY)
         self.Value_opts = Value_opts
@@ -230,3 +230,32 @@ def json_to_item_type_group(name: str, ob_taxonomy: dict):
         return None
     itg = ob_taxonomy['x-ob-item-type-groups'][name]
     return ItemTypeGroup(itg['type'], itg['description'], tuple(itg['group']))
+
+
+def get_schema_superclass(defn: dict):
+    return defn['allOf'][0]['$ref'].split('/')[-1]
+
+
+def is_ob_element(name):
+    defn = OB_TAXONOMY['components']['schemas'][name]
+    if 'allOf' not in defn:
+        return False
+    superclass = get_schema_superclass(defn)
+    return superclass in tuple(t.value for t in TaxonomyElement)
+
+
+def elements_of_ob_object(name, **Element_Value_opts):
+    defn = OB_TAXONOMY['components']['schemas'][name]
+    if is_ob_element(name):
+        properties = None
+    elif 'properties' in defn:
+        properties = defn['properties']
+    elif 'allOf' in defn:
+        properties = defn['allOf'][1]['properties']
+    else:
+        properties = None
+    if properties is None:
+        raise ValueError(f'"{name}" is not an OB object.')
+    propnames = sorted(properties.keys())
+    return {pname: OBElement(pname, **Element_Value_opts.get(pname, {}))
+            for pname in propnames if is_ob_element(pname)}
