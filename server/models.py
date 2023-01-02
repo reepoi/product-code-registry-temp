@@ -30,13 +30,13 @@ class ModelBase(models.base.ModelBase):
             attrs[o] = models.OneToOneField(o, **RELATION_FIELD_KWARGS)
 
     def add_ob_array_usages(name, attrs):
-        NON_FOREIGN_KEY_MODELS = {v.__name__ for v in apps.all_models['server'].values() if not v.__name__ == 'ProdInstruction'}
+        NON_FOREIGN_KEY_MODELS = {v.__name__ for v in apps.all_models['server'].values()
+                                  if obit.get_schema_type(v.__name__) is not obit.OBType.Element}
         arrays = attrs.get('ob_array_usages', None)
         if arrays is None:
             arrays = obit.ob_object_usage_as_array(name, NON_FOREIGN_KEY_MODELS)
         for a in arrays:
             attrs[a] = models.ForeignKey(a, **RELATION_FIELD_KWARGS)
-
 
 
 class Model(models.Model, metaclass=ModelBase):
@@ -57,48 +57,12 @@ class Product(Model):
     )
 
 
-class Package(Model):
-    Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
-
-
-class ProdInstruction(Model):
-    ob_elements = dict(
-        ProdInstruction=obit.OBElement('ProdInstruction'),
-    )
-    ob_objects = tuple()
-    Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
-
-
-class ProdSpecification(Model):
-    Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
-
-
 class CertificationAgency(Model):
     pass
 
 
-class ProdCertification(Model):
-    Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
-
-
 class Location(Model):
     pass
-
-
-class Address(Model):
-    CertificationAgency = models.ForeignKey(CertificationAgency, **RELATION_FIELD_KWARGS)
-
-
-class Contact(Model):
-    CertificationAgency = models.ForeignKey(CertificationAgency, **RELATION_FIELD_KWARGS)
-
-
-class Firmware(Model):
-    ProdCertification = models.ForeignKey(ProdCertification, **RELATION_FIELD_KWARGS)
-
-
-class Warranty(Model):
-    Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
 
 
 class DCInput(Model):
@@ -109,15 +73,51 @@ class DCOutput(Model):
     pass
 
 
-class MPPT(Model):
-    DCInput = models.ForeignKey(DCInput, **RELATION_FIELD_KWARGS)
-
-
 class ProdBattery(Model):
     pass
+
+
+# OB objects used in OB arrays
 
 
 class AlternativeIdentifier(Model):
     pass
 
 
+class MPPT(Model):
+    pass
+
+
+class Warranty(Model):
+    pass
+
+
+class Package(Model):
+    pass
+
+
+class ProdInstruction(Model):
+    ob_elements = dict(
+        ProdInstruction=obit.OBElement('ProdInstruction'),
+    )
+    ob_objects = tuple()
+
+
+class ProdSpecification(Model):
+    pass
+
+
+class ProdCertification(Model):
+    pass
+
+
+class Address(Model):
+    pass
+
+
+class Contact(Model):
+    pass
+
+
+class Firmware(Model):
+    pass
