@@ -1,9 +1,17 @@
-from django.apps import apps
 from django.db import models
 import server.ob_item_types as obit
 
 
 RELATION_FIELD_KWARGS = dict(on_delete=models.DO_NOTHING, blank=True, null=True)
+ALL_MODELS = ['ACInput', 'ACOutput', 'Address', 'AlternativeIdentifier',
+              'CertificationAgency', 'Contact', 'DCInput', 'DCOutput',
+              'Dimension', 'Firmware', 'FrequencyAC', 'InverterEfficiency',
+              'InverterEfficiencyCECTestResult', 'Location', 'MPPT',
+              'ModuleElectRating', 'Package', 'PowerACSurge', 'PowerDCPeak',
+              'ProdBattery', 'ProdCell', 'ProdCertification', 'ProdCombiner',
+              'ProdEnergyStorageSystem', 'ProdGlazing', 'ProdInstruction',
+              'ProdMeter', 'ProdModule', 'ProdName', 'ProdOptimizer',
+              'ProdSpecification', 'ProdWire', 'Product', 'Warranty']
 
 
 class ModelBase(models.base.ModelBase):
@@ -30,11 +38,11 @@ class ModelBase(models.base.ModelBase):
             attrs[o] = models.OneToOneField(o, **RELATION_FIELD_KWARGS)
 
     def add_ob_array_usages(name, attrs):
-        NON_FOREIGN_KEY_MODELS = {v.__name__ for v in apps.all_models['server'].values()
-                                  if obit.get_schema_type(v.__name__) is not obit.OBType.Element}
+        user_schemas = [m for m in ALL_MODELS
+                        if obit.get_schema_type(m) is not obit.OBType.Element]
         arrays = attrs.get('ob_array_usages', None)
         if arrays is None:
-            arrays = obit.ob_object_usage_as_array(name, NON_FOREIGN_KEY_MODELS)
+            arrays = obit.ob_object_usage_as_array(name, user_schemas)
         for a in arrays:
             attrs[a] = models.ForeignKey(a, **RELATION_FIELD_KWARGS)
 
@@ -115,9 +123,6 @@ class ProdOptimizer(Product):
 
 class ProdWire(Product):
     pass
-
-
-# OB objects used in OB arrays
 
 
 class AlternativeIdentifier(Model):
