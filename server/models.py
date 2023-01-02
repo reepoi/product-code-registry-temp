@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.db import models
 import server.ob_item_types as obit
 
@@ -9,7 +10,8 @@ class ModelBase(models.base.ModelBase):
     def __new__(cls, name, bases, attrs, **kwargs):
         if name != 'Model':
             cls.add_ob_elements(name, attrs)
-            # cls.add_ob_objects(name, attrs)
+            cls.add_ob_objects(name, attrs)
+            cls.add_ob_array_usages(name, attrs)
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
     def add_ob_elements(name, attrs):
@@ -19,17 +21,22 @@ class ModelBase(models.base.ModelBase):
         for e in elements.values():
             for primitive, field in e.django_model_fields().items():
                 attrs[f'{e.name}_{primitive}'] = field
-        if 'test_class' in attrs:
-            attrs['ACInput'] = models.ForeignKey(attrs['test_class'][0], **RELATION_FIELD_KWARGS)
 
     def add_ob_objects(name, attrs):
         objects = attrs.get('ob_objects', None)
         if objects is None:
             objects = obit.objects_of_ob_object(name)
-        if objects is not None:
-            for o in objects:
-                name = o.__name__
-                attrs[name] = models.OneToOneField(o, **RELATION_FIELD_KWARGS)
+        for o in objects:
+            attrs[o] = models.OneToOneField(o, **RELATION_FIELD_KWARGS)
+
+    def add_ob_array_usages(name, attrs):
+        NON_FOREIGN_KEY_MODELS = {v.__name__ for v in apps.all_models['server'].values() if not v.__name__ == 'ProdInstruction'}
+        arrays = attrs.get('ob_array_usages', None)
+        if arrays is None:
+            arrays = obit.ob_object_usage_as_array(name, NON_FOREIGN_KEY_MODELS)
+        for a in arrays:
+            attrs[a] = models.ForeignKey(a, **RELATION_FIELD_KWARGS)
+
 
 
 class Model(models.Model, metaclass=ModelBase):
@@ -39,12 +46,7 @@ class Model(models.Model, metaclass=ModelBase):
         abstract = True
 
 
-class ACInput(Model):
-    pass
-
-
 class Dimension(Model):
-    test_class = [ACInput]
     pass
 
 
@@ -53,12 +55,9 @@ class Product(Model):
         'Product',
         ProdCode=dict(max_length=16)
     )
-    ob_objects = (Dimension,)
-    # Dimension = models.OneToOneField(Dimension, **RELATION_FIELD_KWARGS)
 
 
 class Package(Model):
-    Dimension = models.ForeignKey(Dimension, **RELATION_FIELD_KWARGS)
     Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
 
 
@@ -66,6 +65,7 @@ class ProdInstruction(Model):
     ob_elements = dict(
         ProdInstruction=obit.OBElement('ProdInstruction'),
     )
+    ob_objects = tuple()
     Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
 
 
@@ -78,7 +78,6 @@ class CertificationAgency(Model):
 
 
 class ProdCertification(Model):
-    CertificationAgency = models.OneToOneField(CertificationAgency, **RELATION_FIELD_KWARGS)
     Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
 
 
@@ -87,12 +86,10 @@ class Location(Model):
 
 
 class Address(Model):
-    Location = models.OneToOneField(Location,  **RELATION_FIELD_KWARGS)
     CertificationAgency = models.ForeignKey(CertificationAgency, **RELATION_FIELD_KWARGS)
 
 
 class Contact(Model):
-    Address = models.OneToOneField(Address, **RELATION_FIELD_KWARGS)
     CertificationAgency = models.ForeignKey(CertificationAgency, **RELATION_FIELD_KWARGS)
 
 
@@ -104,11 +101,11 @@ class Warranty(Model):
     Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
 
 
-class AlternativeIdentifier(Model):
-    Product = models.ForeignKey(Product, **RELATION_FIELD_KWARGS)
-
-
 class DCInput(Model):
+    pass
+
+
+class DCOutput(Model):
     pass
 
 
@@ -117,4 +114,10 @@ class MPPT(Model):
 
 
 class ProdBattery(Model):
-    DCInput = models.OneToOneField(DCInput, **RELATION_FIELD_KWARGS)
+    pass
+
+
+class AlternativeIdentifier(Model):
+    pass
+
+

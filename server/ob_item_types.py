@@ -30,10 +30,17 @@ class TaxonomyElement(enum.Enum):
     String = 'TaxonomyElementString'
 
 
+class OBType(enum.Enum):
+    Element = enum.auto()
+    Object = enum.auto()
+    Array = enum.auto()
+
+
 @dataclass(frozen=True)
 class ItemType:
     name: str
     description: str
+
 
 @dataclass(frozen=True)
 class ItemTypeValue:
@@ -83,7 +90,7 @@ class OBElement:
 
         self.name = name
         self.description = details['description']
-        self.superclass = TaxonomyElement(get_schema_superclass(allOf))
+        self.superclass = TaxonomyElement(get_schema_superclass(name))
         self.item_type = json_to_item_type(details['x-ob-item-type'], OB_TAXONOMY)
         self.item_type_group = json_to_item_type_group(details['x-ob-item-type-group'], OB_TAXONOMY)
         self.Value_opts = Value_opts
@@ -232,30 +239,58 @@ def json_to_item_type_group(name: str, ob_taxonomy: dict):
     return ItemTypeGroup(itg['type'], itg['description'], tuple(itg['group']))
 
 
-def get_schema_superclass(defn: dict):
+def get_schema_superclass(name: dict):
+    defn = get_schema_defn(name)
     return defn['allOf'][0]['$ref'].split('/')[-1]
 
 
-def is_ob_element(name):
-    defn = OB_TAXONOMY['components']['schemas'][name]
-    if 'allOf' not in defn:
-        return False
-    superclass = get_schema_superclass(defn)
-    return superclass in tuple(t.value for t in TaxonomyElement)
+def get_schema_array_item(name: dict):
+    defn = get_schema_defn(name)
+    return defn['items']['$ref'].split('/')[-1]
+
+
+def get_schema_defn(name):
+    return OB_TAXONOMY['components']['schemas'][name]
+
+
+def get_schema_type(name):
+    defn = get_schema_defn(name)
+    if 'allOf' in defn and get_schema_superclass(name) in tuple(t.value for t in TaxonomyElement):
+        return OBType.Element
+    elif 'items' in defn:
+        return OBType.Array
+    else:
+        return OBType.Object
+
+
+def ob_object_properties(name):
+    defn = get_schema_defn(name)
+    if 'allOf' in defn:
+        return defn['allOf'][1]['properties']
+    else:
+        return defn['properties']
 
 
 def elements_of_ob_object(name, **Element_Value_opts):
-    defn = OB_TAXONOMY['components']['schemas'][name]
-    if is_ob_element(name):
-        properties = None
-    elif 'properties' in defn:
-        properties = defn['properties']
-    elif 'allOf' in defn:
-        properties = defn['allOf'][1]['properties']
-    else:
-        properties = None
-    if properties is None:
-        raise ValueError(f'"{name}" is not an OB object.')
+    properties = ob_object_properties(name)
     propnames = sorted(properties.keys())
     return {pname: OBElement(pname, **Element_Value_opts.get(pname, {}))
-            for pname in propnames if is_ob_element(pname)}
+            for pname in propnames if get_schema_type(pname) is OBType.Element}
+
+
+def objects_of_ob_object(name):
+    properties = ob_object_properties(name)
+    propnames = sorted(properties.keys())
+    return tuple(pname for pname in propnames if get_schema_type(pname) is OBType.Object)
+
+
+def has_ob_array_of(name, array_item_name):
+    properties = ob_object_properties(name)
+    propnames = sorted(properties.keys())
+    arraynames = [pname for pname in propnames if get_schema_type(pname) is OBType.Array]
+    arrayitems = [get_schema_array_item(aitem) for aitem in arraynames]
+    return array_item_name in arrayitems
+
+
+def ob_object_usage_as_array(name, user_schema_names):
+    return tuple(uname for uname in user_schema_names if has_ob_array_of(uname, name))
