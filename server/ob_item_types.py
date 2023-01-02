@@ -91,8 +91,8 @@ class OBElement:
         self.name = name
         self.description = details['description']
         self.superclass = TaxonomyElement(get_schema_superclass(name))
-        self.item_type = json_to_item_type(details['x-ob-item-type'], OB_TAXONOMY)
-        self.item_type_group = json_to_item_type_group(details['x-ob-item-type-group'], OB_TAXONOMY)
+        self.item_type = json_to_item_type(details['x-ob-item-type'])
+        self.item_type_group = json_to_item_type_group(details['x-ob-item-type-group'])
         self.Value_opts = Value_opts
 
     @property
@@ -225,33 +225,39 @@ class OBElement:
                                         max_length=max_length, blank=True)
 
 
-def json_to_item_type(name: str, ob_taxonomy: dict):
-    it = ob_taxonomy['x-ob-item-types'][name]
-    get_item_type_values = lambda key, val_class: tuple(val_class(id, v['label'], v['description'])
-                                                        for id, v in it[key].items())
-    if 'enums' in it:
-        return ItemTypeEnum(name, it['description'], get_item_type_values('enums', Enum))
-    elif 'units' in it:
-        return ItemTypeUnit(name, it['description'], get_item_type_values('units', Unit))
-    else:
-        return ItemType(name, it['description'])
+def json_to_item_type(name: str):
+    it = OB_TAXONOMY['x-ob-item-types'][name]
+    kwargs = dict(name=name, description=it['description'])
+    match it:
+        case {'enums': enums}:
+            kwargs['values'] = tuple(Enum(id, v['label'], v['description'])
+                                     for id, v in enums.items())
+            return ItemTypeEnum(**kwargs)
+        case {'units': units}:
+            kwargs['values'] = tuple(Unit(id, v['label'], v['description'])
+                                     for id, v in units.items())
+            return ItemTypeUnit(**kwargs)
+        case _:
+            return ItemType(**kwargs)
 
 
-def json_to_item_type_group(name: str, ob_taxonomy: dict):
+def json_to_item_type_group(name: str):
     if name == '':
         return None
-    itg = ob_taxonomy['x-ob-item-type-groups'][name]
+    itg = OB_TAXONOMY['x-ob-item-type-groups'][name]
     return ItemTypeGroup(itg['type'], itg['description'], tuple(itg['group']))
 
 
+def get_ref_schema(ref: str):
+    return ref.split('/')[-1]
+
+
 def get_schema_superclass(name: dict):
-    defn = get_schema_defn(name)
-    return defn['allOf'][0]['$ref'].split('/')[-1]
-
-
-def get_schema_array_item(name: dict):
-    defn = get_schema_defn(name)
-    return defn['items']['$ref'].split('/')[-1]
+    match get_schema_defn(name):
+        case {'allOf': [{'$ref': ref}, _]}:
+            return get_ref_schema(ref)
+        case _:
+            raise ValueError(f'"{name}" does not inherit from a superclass.')
 
 
 def get_schema_defn(name):
@@ -259,43 +265,48 @@ def get_schema_defn(name):
 
 
 def get_schema_type(name):
-    defn = get_schema_defn(name)
-    if 'allOf' in defn and get_schema_superclass(name) in tuple(t.value for t in TaxonomyElement):
-        return OBType.Element
-    elif 'items' in defn:
-        return OBType.Array
-    else:
-        return OBType.Object
+    match get_schema_defn(name):
+        case {'allOf': [{'$ref': ref}, _]}:
+            if get_ref_schema(ref) in tuple(t.value for t in TaxonomyElement):
+                return OBType.Element
+            return OBType.Object
+        case {'type': 'object'}:
+            return OBType.Object
+        case {'type': 'array'}:
+            return OBType.Array
+        case _:
+            raise ValueError(f'Unknown schema definition type: "{name}"')
 
 
 def ob_object_properties(name):
-    defn = get_schema_defn(name)
-    if 'allOf' in defn:
-        return defn['allOf'][1]['properties']
-    else:
-        return defn['properties']
+    match get_schema_defn(name):
+        case {'allOf': [{'$ref': _}, {'properties': props}]}:
+            return props
+        case {'type': 'object', 'properties': props}:
+            return props
+        case _:
+            raise ValueError(f'Unknown OB object schema: "{name}"')
 
 
 def elements_of_ob_object(name, **Element_Value_opts):
-    properties = ob_object_properties(name)
-    propnames = sorted(properties.keys())
-    return {pname: OBElement(pname, **Element_Value_opts.get(pname, {}))
-            for pname in propnames if get_schema_type(pname) is OBType.Element}
+    return {n: OBElement(n, **Element_Value_opts.get(n, {}))
+            for n in sorted(ob_object_properties(name))
+            if get_schema_type(n) is OBType.Element}
 
 
 def objects_of_ob_object(name):
-    properties = ob_object_properties(name)
-    propnames = sorted(properties.keys())
-    return tuple(pname for pname in propnames if get_schema_type(pname) is OBType.Object)
-
-
-def has_ob_array_of(name, array_item_name):
-    properties = ob_object_properties(name)
-    propnames = sorted(properties.keys())
-    arraynames = [pname for pname in propnames if get_schema_type(pname) is OBType.Array]
-    arrayitems = [get_schema_array_item(aitem) for aitem in arraynames]
-    return array_item_name in arrayitems
+    return tuple(n for n in sorted(ob_object_properties(name))
+                 if get_schema_type(n) is OBType.Object)
 
 
 def ob_object_usage_as_array(name, user_schema_names):
-    return tuple(uname for uname in user_schema_names if has_ob_array_of(uname, name))
+    uses = []
+    for uname in user_schema_names:
+        for array_name in ob_object_properties(uname):
+            match get_schema_defn(array_name):
+                case {'type': 'array', 'items': {'$ref': ref}}:
+                    if name == get_ref_schema(ref):
+                        uses.append(uname)
+                case _:
+                    continue
+    return tuple(sorted(uses))
