@@ -195,7 +195,9 @@ class OBElement:
 
     def _Unit_field(self):
         max_length = max(len(v.id) for v in self.grouped_item_type.values)
+        choices = tuple((v.id, v.label) for v in self.grouped_item_type.values)
         return models.CharField(self._verbose_field_name('Unit'),
+                                choices=choices,
                                 max_length=max_length, blank=True)
 
     def _Value_field(self):
@@ -214,9 +216,12 @@ class OBElement:
             case TaxonomyElement.String:
                 if self.item_type_has_enums:
                     max_length = max(len(v.id) for v in self.grouped_item_type.values)
+                    choices = tuple((v.id, v.label) for v in self.grouped_item_type.values)
                 else:
                     max_length = self.Value_opts.get('max_length', STR_LEN)
+                    choices = None
                 return models.CharField(self._verbose_field_name('Value'),
+                                        choices=choices,
                                         max_length=max_length, blank=True)
 
 
