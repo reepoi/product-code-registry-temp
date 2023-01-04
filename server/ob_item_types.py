@@ -94,7 +94,7 @@ class OBElement:
     item_type: ItemType
     item_type_group: ItemTypeGroup
 
-    def __init__(self, name, **Value_opts):
+    def __init__(self, name, use_primitive_names=False, **Value_opts):
         allOf = OB_TAXONOMY['components']['schemas'][name]
         details = allOf['allOf'][1]
 
@@ -103,6 +103,7 @@ class OBElement:
         self.superclass = TaxonomyElement(get_schema_superclass(name))
         self.item_type = json_to_item_type(details['x-ob-item-type'])
         self.item_type_group = json_to_item_type_group(details['x-ob-item-type-group'])
+        self.use_primitive_names = use_primitive_names
         self.Value_opts = Value_opts
 
     @property
@@ -141,9 +142,13 @@ class OBElement:
                 for p in self.primitives()}
 
     def model_field_name(self, p: Primitive):
+        if self.use_primitive_names:
+            return p.name
         return f'{self.name}_{p.name}'
 
     def verbose_model_field_name(self, p: Primitive):
+        if self.use_primitive_names:
+            return p.name
         return f'{self.name} {p.name}'
 
     def _item_type_has_values(self, item_type_class):
@@ -189,9 +194,7 @@ class OBElement:
                 return self._Value_field()
 
     def _Decimals_field(self):
-        return models.DecimalField(self.verbose_model_field_name(Primitive.Decimals),
-                                   max_digits=DECIMAL_MAX_DIGITS,
-                                   decimal_places=DECIMAL_PLACES,
+        return models.IntegerField(self.verbose_model_field_name(Primitive.Decimals),
                                    blank=True, null=True)
 
     def _EndTime_field(self):
@@ -199,7 +202,8 @@ class OBElement:
                                     blank=True, null=True)
 
     def _Precision_field(self):
-        return models.IntegerField(blank=True, null=True)
+        return models.IntegerField(self.verbose_model_field_name(Primitive.Precision),
+                                   blank=True, null=True)
 
     def _StartTime_field(self):
         return models.DateTimeField(self.verbose_model_field_name(Primitive.StartTime),
@@ -325,6 +329,12 @@ def elements_of_ob_object(name, **Element_Value_opts):
 def objects_of_ob_object(name):
     return tuple(n for n in sorted(ob_object_properties(name))
                  if get_schema_type(n) is OBType.Object)
+
+
+def arrays_of_ob_object(name):
+    return tuple((n, get_ref_schema(get_schema_defn(n)['items']['$ref']))
+                 for n in sorted(ob_object_properties(name))
+                 if get_schema_type(n) is OBType.Array)
 
 
 def ob_object_usage_as_array(name, user_schema_names):

@@ -17,8 +17,14 @@ ALL_MODELS = ['ACInput', 'ACOutput', 'Address', 'AlternativeIdentifier',
 class ModelBase(models.base.ModelBase):
     def __new__(cls, name, bases, attrs, **kwargs):
         if name != 'Model':
-            cls.add_ob_elements(name, attrs)
-            cls.add_ob_objects(name, attrs)
+            match obit.get_schema_type(name):
+                case obit.OBType.Element:
+                    e = obit.OBElement(name, use_primitive_names=True)
+                    for field_name, field in e.model_fields().items():
+                        attrs[field_name] = field
+                case _:
+                    cls.add_ob_elements(name, attrs)
+                    cls.add_ob_objects(name, attrs)
             cls.add_ob_array_usages(name, attrs)
         return super().__new__(cls, name, bases, attrs, **kwargs)
 
@@ -145,10 +151,7 @@ class Package(Model):
 
 
 class ProdInstruction(Model):
-    ob_elements = dict(
-        ProdInstruction=obit.OBElement('ProdInstruction'),
-    )
-    ob_objects = tuple()
+    pass
 
 
 class ProdSpecification(Model):
@@ -176,10 +179,7 @@ class PowerDCPeak(Model):
 
 
 class FrequencyAC(Model):
-    ob_elements = dict(
-        FrequencyAC=obit.OBElement('FrequencyAC'),
-    )
-    ob_objects = tuple()
+    pass
 
 
 class InverterEfficiencyCECTestResult(Model):
@@ -196,10 +196,3 @@ class ACOutput(Model):
 
 class PowerACSurge(Model):
     pass
-
-
-class ProdName(Model):
-    ob_elements = dict(
-        ProdName=obit.OBElement('ProdName'),
-    )
-    ob_objects = tuple()
