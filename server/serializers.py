@@ -34,10 +34,13 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
         primitives = e.primitives()
         field_pairs = [(p.name, e.model_field_name(p)) for p in primitives]
 
-        def get_ob_element_field(self, obj):
+        def get_ob_element(self, obj):
+            if self.context['unconfirmed_edits']:
+                print('serialize unconfirmed edit value')
+                print(self.context)
             return OrderedDict([(p, getattr(obj, f)) for p, f in field_pairs])
 
-        return get_ob_element_field
+        return get_ob_element
 
     @classmethod
     def add_ob_objects(cls, name, attrs):
@@ -45,7 +48,17 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
         if objects is None:
             objects = obit.objects_of_ob_object(name)
         for o in objects:
-            attrs[o] = eval(o, globals(), locals())()
+            attrs[o] = serializers.SerializerMethodField()
+            attrs[f'get_{o}'] = cls._ob_object_serializer(o)
+
+    @classmethod
+    def _ob_object_serializer(cls, obj_name):
+        serializer = eval(obj_name, globals(), locals())
+
+        def get_ob_object(self, o):
+            return serializer(getattr(o, obj_name), context=self.context).data
+
+        return get_ob_object
 
     @classmethod
     def add_ob_arrays(cls, name, attrs):
@@ -53,11 +66,25 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
         if arrays is None:
             arrays = obit.arrays_of_ob_object(name)
         for plural, singular in arrays:
-            attrs[plural] = eval(singular, globals(), locals())(many=True, source=f'{singular.lower()}_set')
+            attrs[plural] = serializers.SerializerMethodField()
+            attrs[f'get_{plural}'] = cls._ob_array_serializer(singular)
+
+    @classmethod
+    def _ob_array_serializer(cls, array_name_singular):
+        serializer = eval(array_name_singular, globals(), locals())
+        src = f'{array_name_singular.lower()}_set'
+
+        def get_ob_array(self, o):
+            return serializer(getattr(o, src), many=True, context=self.context).data
+
+        return get_ob_array
 
 
 class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
-    pass
+    def to_representation(self, o):
+        if self.context['unconfirmed_edits']:
+            self.context['edits'] = OrderedDict()
+        return super().to_representation(o)
 
 
 class FrequencyAC(Serializer):
