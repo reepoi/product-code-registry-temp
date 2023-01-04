@@ -1,5 +1,6 @@
 import enum
 import json
+import uuid
 from pathlib import Path
 from typing import Tuple
 from dataclasses import dataclass
@@ -204,25 +205,41 @@ class OBElement:
         match self.superclass:
             case TaxonomyElement.Boolean:
                 return models.BooleanField(self._verbose_field_name('Value'),
-                                           blank=True, null=True)
+                                           blank=True, null=True,
+                                           **self.Value_opts)
             case TaxonomyElement.Integer:
                 return models.IntegerField(self._verbose_field_name('Value'),
-                                           blank=True, null=True)
+                                           blank=True, null=True,
+                                           **self.Value_opts)
             case TaxonomyElement.Number:
                 return models.DecimalField(self._verbose_field_name('Value'),
                                            max_digits=DECIMAL_MAX_DIGITS,
                                            decimal_places=DECIMAL_PLACES,
-                                           blank=True, null=True)
+                                           blank=True, null=True,
+                                           **self.Value_opts)
             case TaxonomyElement.String:
+                return self._string_field_by_item_type()
+
+    def _string_field_by_item_type(self):
+        match self.item_type.name:
+            case 'UUIDItemType':
+                field_kwargs = dict(unique=True, editable=False, default=uuid.uuid4)
+                copy_values_between_dicts(field_kwargs, self.Value_opts)
+                return models.UUIDField(self._verbose_field_name('Value'),
+                                        **field_kwargs)
+            case _:
+                field_kwargs = dict(blank=True, max_length=STR_LEN)
+                copy_values_between_dicts(field_kwargs, self.Value_opts)
                 if self.item_type_has_enums:
-                    max_length = max(len(v.id) for v in self.grouped_item_type.values)
-                    choices = tuple((v.id, v.label) for v in self.grouped_item_type.values)
-                else:
-                    max_length = self.Value_opts.get('max_length', STR_LEN)
-                    choices = None
+                    field_kwargs['max_length'] = max(len(v.id) for v in self.grouped_item_type.values)
+                    field_kwargs['choices'] = tuple((v.id, v.label) for v in self.grouped_item_type.values)
                 return models.CharField(self._verbose_field_name('Value'),
-                                        choices=choices,
-                                        max_length=max_length, blank=True)
+                                        **field_kwargs)
+
+
+def copy_values_between_dicts(dest: dict, source: dict):
+    for k, v in source.items():
+        dest[k] = v
 
 
 def json_to_item_type(name: str):

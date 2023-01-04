@@ -134,7 +134,10 @@ class MPPT(Model):
 
 
 class Warranty(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'Warranty',
+        WarrantyID=dict(editable=True)
+    )
 
 
 class Package(Model):

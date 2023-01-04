@@ -40,6 +40,9 @@
       "Product": {
         "type": "object",
         "properties": {
+          "ProductID": {
+            "$ref": "#/components/schemas/ProductID"
+          },
           "ProdName": {
             "$ref": "#/components/schemas/ProdName"
           },
@@ -11551,6 +11554,23 @@
             "x-ob-usage-tips": "",
             "x-ob-sample-value": {
               "Value": 225
+            }
+          }
+        ]
+      },
+      "ProductID": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/TaxonomyElementString"
+          },
+          {
+            "type": "object",
+            "description": "Identifier of a Product in the Product Code Registry.",
+            "x-ob-item-type": "UUIDItemType",
+            "x-ob-item-type-group": "",
+            "x-ob-usage-tips": "",
+            "x-ob-sample-value": {
+              "Value": ""
             }
           }
         ]

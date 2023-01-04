@@ -1,3 +1,6 @@
+from django.apps import apps
 from django.contrib import admin
 
-# Register your models here.
+
+for m in apps.all_models['server'].values():
+    admin.site.register(m)
