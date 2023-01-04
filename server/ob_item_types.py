@@ -31,6 +31,15 @@ class TaxonomyElement(enum.Enum):
     String = 'TaxonomyElementString'
 
 
+class Primitive(enum.Enum):
+    Decimals = enum.auto()
+    EndTime = enum.auto()
+    Precision = enum.auto()
+    StartTime = enum.auto()
+    Unit = enum.auto()
+    Value = enum.auto()
+
+
 class OBType(enum.Enum):
     Element = enum.auto()
     Object = enum.auto()
@@ -116,7 +125,7 @@ class OBElement:
     def item_type_has_units(self):
         return self._item_type_has_values(ItemTypeUnit)
 
-    def django_model_fields(self):
+    def primitives(self):
         match self.superclass:
             case TaxonomyElement.Boolean:
                 return self._boolean_fields()
@@ -127,6 +136,16 @@ class OBElement:
             case TaxonomyElement.String:
                 return self._string_fields()
 
+    def model_fields(self):
+        return {self.model_field_name(p): self._primitive_field(p)
+                for p in self.primitives()}
+
+    def model_field_name(self, p: Primitive):
+        return f'{self.name}_{p.name}'
+
+    def verbose_model_field_name(self, p: Primitive):
+        return f'{self.name} {p.name}'
+
     def _item_type_has_values(self, item_type_class):
         nonempty_item_type_group = self.item_type_group is None or len(self.item_type_group.group) > 0
         return (
@@ -135,84 +154,77 @@ class OBElement:
             and nonempty_item_type_group
         )
 
-    def _field_name(self, primitive_name):
-        return f'{self.name}_{primitive_name}'
-
-    def _verbose_field_name(self, primitive_name):
-        return f'{self.name} {primitive_name}'
-
     def _boolean_fields(self):
-        return dict(
-            EndTime=self._EndTime_field(),
-            StartTime=self._StartTime_field(),
-            Value=self._Value_field()
-        )
+        return [Primitive.EndTime, Primitive.StartTime, Primitive.Value]
 
     def _integer_fields(self):
-        fields = dict(
-            EndTime=self._EndTime_field(),
-            StartTime=self._StartTime_field(),
-            Value=self._Value_field()
-        )
+        fields = [Primitive.EndTime, Primitive.StartTime, Primitive.Value]
         if self.item_type_has_units:
-            fields['Unit'] = self._Unit_field()
+            fields.append(Primitive.Unit)
         return fields
 
     def _number_fields(self):
-        fields = dict(
-            Decimals=self._Decimals_field(),
-            EndTime=self._EndTime_field(),
-            Precision=self._Precision_field(),
-            StartTime=self._StartTime_field(),
-            Value=self._Value_field()
-        )
+        fields = [Primitive.Decimals, Primitive.EndTime, Primitive.Precision,
+                  Primitive.StartTime, Primitive.Value]
         if self.item_type_has_units:
-            fields['Unit'] = self._Unit_field()
+            fields.append(Primitive.Unit)
         return fields
 
     def _string_fields(self):
-        return dict(
-            EndTime=self._EndTime_field(),
-            StartTime=self._StartTime_field(),
-            Value=self._Value_field()
-        )
+        return [Primitive.EndTime, Primitive.StartTime, Primitive.Value]
+
+    def _primitive_field(self, primitive: Primitive):
+        match primitive:
+            case Primitive.Decimals:
+                return self._Decimals_field()
+            case Primitive.EndTime:
+                return self._EndTime_field()
+            case Primitive.Precision:
+                return self._Precision_field()
+            case Primitive.StartTime:
+                return self._StartTime_field()
+            case Primitive.Unit:
+                return self._Unit_field()
+            case Primitive.Value:
+                return self._Value_field()
 
     def _Decimals_field(self):
-        return models.DecimalField(self._verbose_field_name('Decimals'),
+        return models.DecimalField(self.verbose_model_field_name(Primitive.Decimals),
                                    max_digits=DECIMAL_MAX_DIGITS,
                                    decimal_places=DECIMAL_PLACES,
                                    blank=True, null=True)
 
     def _EndTime_field(self):
-        return models.DateTimeField(self._verbose_field_name('EndTime'),
+        return models.DateTimeField(self.verbose_model_field_name(Primitive.EndTime),
                                     blank=True, null=True)
 
     def _Precision_field(self):
         return models.IntegerField(blank=True, null=True)
 
     def _StartTime_field(self):
-        return models.DateTimeField(self._verbose_field_name('EndTime'),
+        return models.DateTimeField(self.verbose_model_field_name(Primitive.StartTime),
                                     blank=True, null=True)
 
     def _Unit_field(self):
         max_length = max(len(v.id) for v in self.grouped_item_type.values)
         choices = tuple((v.id, v.label) for v in self.grouped_item_type.values)
-        return models.CharField(self._verbose_field_name('Unit'),
+        return models.CharField(self.verbose_model_field_name(Primitive.Unit),
                                 choices=choices,
                                 max_length=max_length, blank=True)
 
     def _Value_field(self):
+        verbose_name = self.verbose_model_field_name(Primitive.Value)
         match self.superclass:
             case TaxonomyElement.Boolean:
-                return models.BooleanField(self._verbose_field_name('Value'),
+                return models.BooleanField(verbose_name,
                                            blank=True, null=True,
                                            **self.Value_opts)
             case TaxonomyElement.Integer:
-                return models.IntegerField(self._verbose_field_name('Value'),
+                return models.IntegerField(verbose_name,
                                            blank=True, null=True,
                                            **self.Value_opts)
             case TaxonomyElement.Number:
-                return models.DecimalField(self._verbose_field_name('Value'),
+                return models.DecimalField(verbose_name,
                                            max_digits=DECIMAL_MAX_DIGITS,
                                            decimal_places=DECIMAL_PLACES,
                                            blank=True, null=True,
@@ -221,20 +233,19 @@ class OBElement:
                 return self._string_field_by_item_type()
 
     def _string_field_by_item_type(self):
+        verbose_name = self.verbose_model_field_name(Primitive.Value)
         match self.item_type.name:
             case 'UUIDItemType':
                 field_kwargs = dict(unique=True, editable=False, default=uuid.uuid4)
                 copy_values_between_dicts(field_kwargs, self.Value_opts)
-                return models.UUIDField(self._verbose_field_name('Value'),
-                                        **field_kwargs)
+                return models.UUIDField(verbose_name, **field_kwargs)
             case _:
                 field_kwargs = dict(blank=True, max_length=STR_LEN)
                 copy_values_between_dicts(field_kwargs, self.Value_opts)
                 if self.item_type_has_enums:
                     field_kwargs['max_length'] = max(len(v.id) for v in self.grouped_item_type.values)
                     field_kwargs['choices'] = tuple((v.id, v.label) for v in self.grouped_item_type.values)
-                return models.CharField(self._verbose_field_name('Value'),
-                                        **field_kwargs)
+                return models.CharField(verbose_name, **field_kwargs)
 
 
 def copy_values_between_dicts(dest: dict, source: dict):

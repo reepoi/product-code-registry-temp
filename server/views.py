@@ -7,7 +7,7 @@ from server import serializers
 
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = models.Product.objects.all()
-    serializer_class = serializers.ProductSerializer
+    serializer_class = serializers.Product
 
 
 class ProductByProdCodeViewSet(ProductViewSet):

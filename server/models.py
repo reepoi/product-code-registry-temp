@@ -27,8 +27,8 @@ class ModelBase(models.base.ModelBase):
         if elements is None:
             elements = obit.elements_of_ob_object(name)
         for e in elements.values():
-            for primitive, field in e.django_model_fields().items():
-                attrs[f'{e.name}_{primitive}'] = field
+            for field_name, field in e.model_fields().items():
+                attrs[field_name] = field
 
     def add_ob_objects(name, attrs):
         objects = attrs.get('ob_objects', None)
