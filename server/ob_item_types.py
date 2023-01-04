@@ -241,20 +241,15 @@ class OBElement:
         match self.item_type.name:
             case 'UUIDItemType':
                 field_kwargs = dict(unique=True, editable=False, default=uuid.uuid4)
-                copy_values_between_dicts(field_kwargs, self.Value_opts)
+                field_kwargs.update(self.Value_opts)
                 return models.UUIDField(verbose_name, **field_kwargs)
             case _:
                 field_kwargs = dict(blank=True, max_length=STR_LEN)
-                copy_values_between_dicts(field_kwargs, self.Value_opts)
+                field_kwargs.update(self.Value_opts)
                 if self.item_type_has_enums:
                     field_kwargs['max_length'] = max(len(v.id) for v in self.grouped_item_type.values)
                     field_kwargs['choices'] = tuple((v.id, v.label) for v in self.grouped_item_type.values)
                 return models.CharField(verbose_name, **field_kwargs)
-
-
-def copy_values_between_dicts(dest: dict, source: dict):
-    for k, v in source.items():
-        dest[k] = v
 
 
 def json_to_item_type(name: str):

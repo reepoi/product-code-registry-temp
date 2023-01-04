@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from rest_framework import serializers
 
+from server import models
 from server import ob_item_types as obit
 
 
@@ -59,6 +60,22 @@ class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
     pass
 
 
+class FrequencyAC(Serializer):
+    pass
+
+
+class ACInput(Serializer):
+    pass
+
+
+class PowerACSurge(Serializer):
+    pass
+
+
+class ACOutput(Serializer):
+    pass
+
+
 class Location(Serializer):
     pass
 
@@ -75,6 +92,22 @@ class Contact(Serializer):
     pass
 
 
+class MPPT(Serializer):
+    pass
+
+
+class DCInput(Serializer):
+    pass
+
+
+class PowerDCPeak(Serializer):
+    pass
+
+
+class DCOutput(Serializer):
+    pass
+
+
 class Firmware(Serializer):
     pass
 
@@ -84,6 +117,14 @@ class CertificationAgency(Serializer):
 
 
 class Dimension(Serializer):
+    pass
+
+
+class InverterEfficiencyCECTestResult(Serializer):
+    pass
+
+
+class InverterEfficiency(Serializer):
     pass
 
 
@@ -107,5 +148,78 @@ class Warranty(Serializer):
     pass
 
 
-class Product(Serializer):
+class ModuleElectRating(Serializer):
     pass
+
+
+class ProdBattery(Serializer):
+    pass
+
+
+class ProdCell(Serializer):
+    pass
+
+
+class ProdCombiner(Serializer):
+    pass
+
+
+class ProdEnergyStorageSystem(Serializer):
+    pass
+
+
+class ProdGlazing(Serializer):
+    pass
+
+
+class ProdInverter(Serializer):
+    pass
+
+
+class ProdMeter(Serializer):
+    pass
+
+
+class ProdModule(Serializer):
+    pass
+
+
+class ProdName(Serializer):
+    pass
+
+
+class ProdOptimizer(Serializer):
+    pass
+
+
+class ProdWire(Serializer):
+    pass
+
+
+class Product(Serializer):
+    def to_representation(self, o):
+        kwargs = dict(context=self.context)
+        match o:
+            case models.Product(prodbattery=p):
+                subclass = ProdBattery(p, **kwargs).data
+            case models.Product(prodcell=p):
+                subclass = ProdCell(p, **kwargs).data
+            case models.Product(prodcombiner=p):
+                subclass = ProdCombiner(p, **kwargs).data
+            case models.Product(prodenergystoragesystem=p):
+                subclass = ProdEnergyStorageSystem(p, **kwargs).data
+            case models.Product(prodinverter=p):
+                subclass = ProdInverter(p, **kwargs).data
+            case models.Product(prodmeter=p):
+                subclass = ProdMeter(p, **kwargs).data
+            case models.Product(prodmodule=p):
+                subclass = ProdModule(p, **kwargs).data
+            case models.Product(prodoptimizer=p):
+                subclass = ProdOptimizer(p, **kwargs).data
+            case models.Product(prodwire=p):
+                subclass = ProdWire(p, **kwargs).data
+            case models.Product():
+                subclass = OrderedDict()
+        superclass = super().to_representation(o)
+        subclass.update(superclass)
+        return subclass

@@ -123,6 +123,10 @@ class ModuleElectRating(Model):
     pass
 
 
+class ProdName(Model):
+    pass
+
+
 class ProdOptimizer(Product):
     pass
 
