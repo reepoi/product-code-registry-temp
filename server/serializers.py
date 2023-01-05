@@ -1,7 +1,8 @@
+import datetime
 from collections import OrderedDict
 
-from django.apps import apps
 from django.db import connection
+from django.utils import timezone
 from rest_framework import serializers
 
 from server import models
@@ -39,6 +40,7 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
 
         def get_ob_element(self, obj):
             if self.context['unconfirmed_edits']:
+                # if (date := getattr(obj, 'OptimizerEfficiencyMax_EndTime', None)) is not None:
                 return OrderedDict([
                     (p, self.context['edits'].get(f, getattr(obj, f)))
                     for p, f in field_pairs
@@ -107,7 +109,13 @@ class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
                         models.Edit.TypeChoice.Update.value
                     )
                 )
-                self.context['edits'] = {f: v for f, v in cursor.fetchall()}
+                edits = OrderedDict()
+                for f, v in cursor.fetchall():
+                    if f.endswith(obit.Primitive.StartTime.name) or f.endswith(obit.Primitive.EndTime.name):
+                        edits[f] = timezone.make_aware(datetime.datetime.fromisoformat(v))
+                    else:
+                        edits[f] = v
+                self.context['edits'] = edits
         return super().to_representation(o)
 
 
