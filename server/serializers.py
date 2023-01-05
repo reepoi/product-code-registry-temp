@@ -91,11 +91,12 @@ class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
         if self.context['unconfirmed_edits']:
             edits = models.Edit.objects.raw(
                 """
-                SELECT id, Field FROM server_Edit JOIN (
-                    SELECT max(DateSubmitted) as DateSubmitted FROM server_Edit
+                SELECT id, server_Edit.Field FROM server_Edit JOIN (
+                    SELECT Field, max(DateSubmitted) as DateSubmitted FROM server_Edit
                     GROUP BY Field
                 ) as latest_edits
                 ON server_Edit.DateSubmitted=latest_edits.DateSubmitted
+                AND server_Edit.Field=latest_edits.Field
                 WHERE server_Edit.ModelName=%s
                 AND server_Edit.InstanceID=%s
                 AND server_Edit.Status=%s
