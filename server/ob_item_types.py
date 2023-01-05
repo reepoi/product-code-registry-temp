@@ -2,7 +2,7 @@ import enum
 import json
 import uuid
 from pathlib import Path
-from typing import Tuple
+from typing import Iterable, Tuple
 from dataclasses import dataclass
 from django.db import models
 
@@ -194,7 +194,7 @@ class OBElement:
                 return self._Value_field()
 
     def _Decimals_field(self):
-        return models.IntegerField(self.verbose_model_field_name(Primitive.Decimals),
+        return models.PositiveIntegerField(self.verbose_model_field_name(Primitive.Decimals),
                                    blank=True, null=True)
 
     def _EndTime_field(self):
@@ -202,7 +202,7 @@ class OBElement:
                                     blank=True, null=True)
 
     def _Precision_field(self):
-        return models.IntegerField(self.verbose_model_field_name(Primitive.Precision),
+        return models.PositiveIntegerField(self.verbose_model_field_name(Primitive.Precision),
                                    blank=True, null=True)
 
     def _StartTime_field(self):
@@ -220,12 +220,10 @@ class OBElement:
         verbose_name = self.verbose_model_field_name(Primitive.Value)
         match self.superclass:
             case TaxonomyElement.Boolean:
-                return models.BooleanField(verbose_name,
-                                           blank=True, null=True,
+                return models.BooleanField(verbose_name, blank=True, null=True,
                                            **self.Value_opts)
             case TaxonomyElement.Integer:
-                return models.IntegerField(verbose_name,
-                                           blank=True, null=True,
+                return models.IntegerField(verbose_name, blank=True, null=True,
                                            **self.Value_opts)
             case TaxonomyElement.Number:
                 return models.DecimalField(verbose_name,
@@ -343,3 +341,10 @@ def ob_object_usage_as_array(name, user_schema_names):
                 case _:
                     continue
     return tuple(sorted(uses))
+
+
+def max_ob_object_element_name_length(*args: Iterable[str]):
+    return max(len(n) for n in set().union(*(
+        set(elements_of_ob_object(m)) for m in args
+        if get_schema_type(m) is OBType.Object
+    )))

@@ -12,7 +12,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_context(self):
         super_context = super().get_serializer_context()
         query_params = self.request.query_params
-        context = dict(unconfirmed_edits=query_params['unconfirmed_edits'] == 'true')
+        context = dict(unconfirmed_edits=query_params.get('unconfirmed_edits', '') == 'true')
         context.update(super_context)
         return context
 
