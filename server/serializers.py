@@ -89,16 +89,18 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
 class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
     def to_representation(self, o):
         if self.context['unconfirmed_edits']:
-            edits = models.Edit.objects.select_related(
-                *(m.lower() for m in models.EDIT_MODELS)
-            ).raw(
-                'SELECT id, Field FROM server_Edit '
-                'JOIN (SELECT max(DateSubmitted) as latest_DateSubmitted FROM server_Edit GROUP BY Field) as latest_Edit_DateSubmitted '
-                'ON server_Edit.DateSubmitted=latest_Edit_DateSubmitted.latest_DateSubmitted '
-                'WHERE server_Edit.ModelName=%s '
-                'AND server_Edit.InstanceID=%s '
-                'AND server_Edit.Status=%s '
-                'AND server_Edit.Type=%s;',
+            edits = models.Edit.objects.raw(
+                """
+                SELECT id, Field FROM server_Edit JOIN (
+                    SELECT max(DateSubmitted) as DateSubmitted FROM server_Edit
+                    GROUP BY Field
+                ) as latest_edits
+                ON server_Edit.DateSubmitted=latest_edits.DateSubmitted
+                WHERE server_Edit.ModelName=%s
+                AND server_Edit.InstanceID=%s
+                AND server_Edit.Status=%s
+                AND server_Edit.Type=%s;
+                """,
                 params=(
                     o.__class__.__name__, o.id,
                     models.Edit.StatusChoice.Pending.value,
