@@ -1,4 +1,7 @@
 from collections import OrderedDict
+
+from django.apps import apps
+from django.db import connection
 from rest_framework import serializers
 
 from server import models
@@ -36,8 +39,10 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
 
         def get_ob_element(self, obj):
             if self.context['unconfirmed_edits']:
-                print('serialize unconfirmed edit value')
-                print(self.context)
+                return OrderedDict([
+                    (p, self.context['edits'].get(f, getattr(obj, f)))
+                    for p, f in field_pairs
+                ])
             return OrderedDict([(p, getattr(obj, f)) for p, f in field_pairs])
 
         return get_ob_element
@@ -83,7 +88,26 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
 class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
     def to_representation(self, o):
         if self.context['unconfirmed_edits']:
-            self.context['edits'] = OrderedDict()
+            field_values = ', '.join([f'server_{m}.FieldValue' for m in models.EDIT_MODELS])
+            edit_subclass_joins = ''.join([f'LEFT JOIN server_{m} ON server_{m}.edit_ptr_id=server_Edit.id ' for m in models.EDIT_MODELS])
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f'SELECT Field, COALESCE({field_values}) '
+                    'FROM server_Edit '
+                    'JOIN (SELECT max(DateSubmitted) as latest_DateSubmitted FROM server_Edit GROUP BY Field) as latest_Edit_DateSubmitted '
+                    'ON server_Edit.DateSubmitted=latest_Edit_DateSubmitted.latest_DateSubmitted '
+                    f'{edit_subclass_joins}'
+                    'WHERE server_Edit.ModelName=%s '
+                    'AND server_Edit.InstanceID=%s '
+                    'AND server_Edit.Status=%s '
+                    'AND server_Edit.Type=%s;',
+                    params=(
+                        o.__class__.__name__, o.id,
+                        models.Edit.StatusChoice.Pending.value,
+                        models.Edit.TypeChoice.Update.value
+                    )
+                )
+                self.context['edits'] = {f: v for f, v in cursor.fetchall()}
         return super().to_representation(o)
 
 

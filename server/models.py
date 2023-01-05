@@ -5,15 +5,20 @@ import server.ob_item_types as obit
 
 
 RELATION_FIELD_KWARGS = dict(on_delete=models.DO_NOTHING, blank=True, null=True)
-OB_MODELS = ['ACInput', 'ACOutput', 'Address', 'AlternativeIdentifier',
-              'CertificationAgency', 'Contact', 'DCInput', 'DCOutput',
-              'Dimension', 'Firmware', 'FrequencyAC', 'InverterEfficiency',
-              'InverterEfficiencyCECTestResult', 'Location', 'MPPT',
-              'ModuleElectRating', 'Package', 'PowerACSurge', 'PowerDCPeak',
-              'ProdBattery', 'ProdCell', 'ProdCertification', 'ProdCombiner',
-              'ProdEnergyStorageSystem', 'ProdGlazing', 'ProdInstruction',
-              'ProdMeter', 'ProdModule', 'ProdName', 'ProdOptimizer',
-              'ProdSpecification', 'ProdWire', 'Product', 'Warranty']
+OB_MODELS = (
+    'ACInput', 'ACOutput', 'Address', 'AlternativeIdentifier',
+    'CertificationAgency', 'Contact', 'DCInput', 'DCOutput', 'Dimension',
+    'Firmware', 'FrequencyAC', 'InverterEfficiency',
+    'InverterEfficiencyCECTestResult', 'Location', 'MPPT', 'ModuleElectRating',
+    'Package', 'PowerACSurge', 'PowerDCPeak', 'ProdBattery', 'ProdCell',
+    'ProdCertification', 'ProdCombiner', 'ProdEnergyStorageSystem',
+    'ProdGlazing', 'ProdInstruction', 'ProdMeter', 'ProdModule', 'ProdName',
+    'ProdOptimizer', 'ProdSpecification', 'ProdWire', 'Product', 'Warranty'
+)
+EDIT_MODELS = (
+    'EditChar', 'EditDateTime', 'EditDecimal', 'EditPositiveInteger',
+    'EditInteger', 'EditURL', 'EditUUID'
+)
 
 
 class ModelBase(models.base.ModelBase):
@@ -211,7 +216,7 @@ class User(auth.models.AbstractUser):
 class Edit(models.Model):
     StatusChoice = enum.Enum('Statuses', {s: s[0] for s in ('Approved', 'Pending', 'Rejected')})
     TypeChoice = enum.Enum('Types', {t: t[0] for t in ('Addition', 'Update', 'Deletion')})
-    Model = models.CharField(max_length=max(len(m) for m in OB_MODELS))
+    ModelName = models.CharField(choices=[(m, m) for m in OB_MODELS], max_length=max(len(m) for m in OB_MODELS))
     InstanceID = models.PositiveBigIntegerField()  # to match BigAutoField
     Field = models.CharField(max_length=obit.max_ob_object_element_name_length(*OB_MODELS))
     Status = models.CharField(choices=[(s.value, s.name) for s in StatusChoice], max_length=max(len(s.value) for s in StatusChoice))
