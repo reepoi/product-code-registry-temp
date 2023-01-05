@@ -1,8 +1,5 @@
-import datetime
 from collections import OrderedDict
 
-from django.db import connection
-from django.utils import timezone
 from rest_framework import serializers
 
 from server import models
@@ -38,15 +35,13 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
         primitives = e.primitives()
         field_pairs = [(p.name, e.model_field_name(p)) for p in primitives]
 
-        def get_ob_element(self, obj):
-            if self.context['unconfirmed_edits']:
-                # if (date := getattr(obj, 'OptimizerEfficiencyMax_EndTime', None)) is not None:
-                return OrderedDict([
-                    (p, self.context['edits'].get(f, getattr(obj, f)))
-                    for p, f in field_pairs
-                ])
-            return OrderedDict([(p, getattr(obj, f)) for p, f in field_pairs])
-
+        def get_ob_element(self, o):
+            data = OrderedDict()
+            for p, f in field_pairs:
+                data[p] = getattr(o, f)
+                if self.context['unconfirmed_edits']:
+                    data[p] = self.context['edits'].get(f, data[p])
+            return data
         return get_ob_element
 
     @classmethod
@@ -63,6 +58,8 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
         serializer = eval(obj_name, globals(), locals())
 
         def get_ob_object(self, o):
+            context = self.context.copy()
+            context.pop('unconfirmed_edits', None)
             return serializer(getattr(o, obj_name), context=self.context).data
 
         return get_ob_object
@@ -82,6 +79,8 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
         src = f'{array_name_singular.lower()}_set'
 
         def get_ob_array(self, o):
+            context = self.context.copy()
+            context.pop('unconfirmed_edits', None)
             return serializer(getattr(o, src), many=True, context=self.context).data
 
         return get_ob_array
@@ -90,32 +89,23 @@ class SerializerMetaclass(serializers.SerializerMetaclass):
 class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
     def to_representation(self, o):
         if self.context['unconfirmed_edits']:
-            field_values = ', '.join([f'server_{m}.FieldValue' for m in models.EDIT_MODELS])
-            edit_subclass_joins = ''.join([f'LEFT JOIN server_{m} ON server_{m}.edit_ptr_id=server_Edit.id ' for m in models.EDIT_MODELS])
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f'SELECT Field, COALESCE({field_values}) '
-                    'FROM server_Edit '
-                    'JOIN (SELECT max(DateSubmitted) as latest_DateSubmitted FROM server_Edit GROUP BY Field) as latest_Edit_DateSubmitted '
-                    'ON server_Edit.DateSubmitted=latest_Edit_DateSubmitted.latest_DateSubmitted '
-                    f'{edit_subclass_joins}'
-                    'WHERE server_Edit.ModelName=%s '
-                    'AND server_Edit.InstanceID=%s '
-                    'AND server_Edit.Status=%s '
-                    'AND server_Edit.Type=%s;',
-                    params=(
-                        o.__class__.__name__, o.id,
-                        models.Edit.StatusChoice.Pending.value,
-                        models.Edit.TypeChoice.Update.value
-                    )
+            edits = models.Edit.objects.select_related(
+                *(m.lower() for m in models.EDIT_MODELS)
+            ).raw(
+                'SELECT id, Field FROM server_Edit '
+                'JOIN (SELECT max(DateSubmitted) as latest_DateSubmitted FROM server_Edit GROUP BY Field) as latest_Edit_DateSubmitted '
+                'ON server_Edit.DateSubmitted=latest_Edit_DateSubmitted.latest_DateSubmitted '
+                'WHERE server_Edit.ModelName=%s '
+                'AND server_Edit.InstanceID=%s '
+                'AND server_Edit.Status=%s '
+                'AND server_Edit.Type=%s;',
+                params=(
+                    o.__class__.__name__, o.id,
+                    models.Edit.StatusChoice.Pending.value,
+                    models.Edit.TypeChoice.Update.value
                 )
-                edits = OrderedDict()
-                for f, v in cursor.fetchall():
-                    if f.endswith(obit.Primitive.StartTime.name) or f.endswith(obit.Primitive.EndTime.name):
-                        edits[f] = timezone.make_aware(datetime.datetime.fromisoformat(v))
-                    else:
-                        edits[f] = v
-                self.context['edits'] = edits
+            )
+            self.context['edits'] = {e.Field: e.FieldValue for e in edits}
         return super().to_representation(o)
 
 

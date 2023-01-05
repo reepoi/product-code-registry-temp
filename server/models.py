@@ -228,6 +228,31 @@ class Edit(models.Model):
     SubmittedBy = models.ForeignKey(auth.get_user_model(), related_name='edits_submittedby_set', on_delete=models.DO_NOTHING)
     ApprovedBy = models.ForeignKey(auth.get_user_model(), related_name='edits_approvedby_set', on_delete=models.DO_NOTHING, blank=True, null=True)
 
+    @property
+    def FieldValue(self):
+        return self._subclass().FieldValue
+
+    @property
+    def FieldValueOld(self):
+        return self._subclass().FieldValueOld
+
+    def _subclass(self):
+        match self:
+            case Edit(editchar=s):
+                return s
+            case Edit(editdatetime=s):
+                return s
+            case Edit(editdecimal=s):
+                return s
+            case Edit(editpositiveinteger=s):
+                return s
+            case Edit(editinteger=s):
+                return s
+            case Edit(editurl=s):
+                return s
+            case Edit(edituuid=s):
+                return s
+
 
 class EditChar(Edit):
     FieldValue = models.CharField(max_length=obit.STR_LEN, blank=True)
