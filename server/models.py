@@ -1,10 +1,12 @@
 import enum
+
 from django.db import models
+from django.core import validators
 from django.contrib import auth
 import server.ob_item_types as obit
 
 
-RELATION_FIELD_KWARGS = dict(on_delete=models.DO_NOTHING, blank=True, null=True)
+FOREIGN_KEY_KWARGS = dict(on_delete=models.DO_NOTHING)
 OB_MODELS = (
     'ACInput', 'ACOutput', 'Address', 'AlternativeIdentifier',
     'CertificationAgency', 'Contact', 'DCInput', 'DCOutput', 'Dimension',
@@ -48,7 +50,7 @@ class ModelBase(models.base.ModelBase):
         if objects is None:
             objects = obit.objects_of_ob_object(name)
         for o in objects:
-            attrs[o] = models.OneToOneField(o, **RELATION_FIELD_KWARGS)
+            attrs[o] = models.OneToOneField(o, on_delete=models.DO_NOTHING)
 
     def add_ob_array_usages(name, attrs):
         user_schemas = [m for m in OB_MODELS
@@ -57,7 +59,7 @@ class ModelBase(models.base.ModelBase):
         if arrays is None:
             arrays = obit.ob_object_usage_as_array(name, user_schemas)
         for a in arrays:
-            attrs[a] = models.ForeignKey(a, **RELATION_FIELD_KWARGS)
+            attrs[a] = models.ForeignKey(a, **FOREIGN_KEY_KWARGS)
 
 
 class Model(models.Model, metaclass=ModelBase):
@@ -74,6 +76,10 @@ class Dimension(Model):
 class Product(Model):
     ob_elements = obit.elements_of_ob_object(
         'Product',
+        FileFolderURL=dict(
+            max_length=obit.URL_LEN,
+            validators=[validators.URLValidator()]
+        ),
         ProdCode=dict(max_length=16)
     )
 
@@ -87,7 +93,14 @@ class Location(Model):
 
 
 class DCInput(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'DCInput',
+        MPPTNumber=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        )
+    )
 
 
 class DCOutput(Model):
@@ -119,11 +132,39 @@ class ProdMeter(Product):
 
 
 class ProdGlazing(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'ProdGlazing',
+        FileFolderURL=dict(
+            max_length=obit.URL_LEN,
+            validators=[validators.URLValidator()]
+        )
+    )
 
 
 class ProdModule(Product):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'ProdModule',
+        BypassDiodeQuantity=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        ),
+        CellStringsParallelQuantity=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        ),
+        CellCount=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        ),
+        CellsInSeries=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        )
+    )
 
 
 class ModuleElectRating(Model):
@@ -143,16 +184,30 @@ class ProdWire(Product):
 
 
 class AlternativeIdentifier(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'AlternativeIdentifier',
+        Identifier=dict(unique=True)
+    )
 
 
 class MPPT(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'MPPT',
+        MPPTInputStrings=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        )
+    )
 
 
 class Warranty(Model):
     ob_elements = obit.elements_of_ob_object(
         'Warranty',
+        FileFolderURL=dict(
+            max_length=obit.URL_LEN,
+            validators=[validators.URLValidator()]
+        ),
         WarrantyID=dict(editable=True, blank=True, default='')
     )
 
@@ -170,7 +225,13 @@ class ProdSpecification(Model):
 
 
 class ProdCertification(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'ProdCertification',
+        FileFolderURL=dict(
+            max_length=obit.URL_LEN,
+            validators=[validators.URLValidator()]
+        )
+    )
 
 
 class Address(Model):
@@ -178,7 +239,10 @@ class Address(Model):
 
 
 class Contact(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'Contact',
+        URL=dict(validators=[validators.URLValidator()])
+    )
 
 
 class Firmware(Model):
@@ -202,7 +266,14 @@ class ACInput(Model):
 
 
 class ACOutput(Model):
-    pass
+    ob_elements = obit.elements_of_ob_object(
+        'ACOutput',
+        InterconnectionLineCount=dict(
+            field_class=models.PositiveIntegerField,
+            validators=[validators.MinValueValidator(0)],
+            blank=True, null=True
+        )
+    )
 
 
 class PowerACSurge(Model):
@@ -218,7 +289,7 @@ class Edit(models.Model):
     TypeChoice = enum.Enum('Types', {t: t[0] for t in ('Addition', 'Update', 'Deletion')})
     ModelName = models.CharField(choices=[(m, m) for m in OB_MODELS], max_length=max(len(m) for m in OB_MODELS))
     InstanceID = models.PositiveBigIntegerField()  # to match BigAutoField
-    Field = models.CharField(max_length=obit.max_ob_object_element_name_length(*OB_MODELS))
+    FieldName = models.CharField(max_length=obit.max_ob_object_element_name_length(*OB_MODELS))
     Status = models.CharField(choices=[(s.value, s.name) for s in StatusChoice], max_length=max(len(s.value) for s in StatusChoice))
     Type = models.CharField(choices=[(t.value, t.name) for t in TypeChoice], max_length=max(len(t.value) for t in TypeChoice))
     DataSourceComment = models.CharField(max_length=obit.STR_LEN, blank=True)

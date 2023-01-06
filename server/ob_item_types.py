@@ -1,10 +1,13 @@
 import enum
 import json
+import re
 import uuid
 from pathlib import Path
 from typing import Iterable, Tuple
 from dataclasses import dataclass
+
 from django.db import models
+from django.core import validators
 
 
 NAME_LEN = 100
@@ -46,9 +49,12 @@ class OBType(enum.Enum):
     Array = enum.auto()
 
 
+ItemTypeName = enum.Enum('ItemTypeName', {n: n for n in OB_TAXONOMY['x-ob-item-types']})
+
+
 @dataclass(frozen=True)
 class ItemType:
-    name: str
+    name: ItemTypeName
     description: str
 
 
@@ -218,27 +224,83 @@ class OBElement:
 
     def _Value_field(self):
         verbose_name = self.verbose_model_field_name(Primitive.Value)
+        if (fc := self.Value_opts.pop('field_class', None)) is not None:
+            return fc(verbose_name, **self.Value_opts)
         match self.superclass:
             case TaxonomyElement.Boolean:
-                return models.BooleanField(verbose_name, blank=True, null=True,
-                                           **self.Value_opts)
+                field_kwargs = dict(blank=True, null=True)
+                field_kwargs.update(self.Value_opts)
+                return models.BooleanField(verbose_name, **field_kwargs)
             case TaxonomyElement.Integer:
-                return models.IntegerField(verbose_name, blank=True, null=True,
-                                           **self.Value_opts)
+                return self._integer_field_by_item_type()
             case TaxonomyElement.Number:
-                return models.DecimalField(verbose_name,
-                                           max_digits=DECIMAL_MAX_DIGITS,
-                                           decimal_places=DECIMAL_PLACES,
-                                           blank=True, null=True,
-                                           **self.Value_opts)
+                return self._number_field_by_item_type()
             case TaxonomyElement.String:
                 return self._string_field_by_item_type()
+
+    def _integer_field_by_item_type(self):
+        verbose_name = self.verbose_model_field_name(Primitive.Value)
+        match self.item_type.name:
+            case ItemTypeName.DurationItemType:
+                field_kwargs = dict(
+                    validators=[
+                        validators.MinValueValidator(0),
+                    ],
+                    blank=True, null=True
+                )
+                field_kwargs.update(self.Value_opts)
+                return models.PositiveIntegerField(verbose_name, **field_kwargs)
+            case _:
+                field_kwargs = dict(blank=True, null=True)
+                field_kwargs.update(self.Value_opts)
+                return models.IntegerField(verbose_name, **field_kwargs)
+
+    def _number_field_by_item_type(self):
+        verbose_name = self.verbose_model_field_name(Primitive.Value)
+        decimal_validators = [validators.DecimalValidator(DECIMAL_MAX_DIGITS, DECIMAL_PLACES)]
+        match self.item_type.name:
+            case ItemTypeName.DurationItemType | ItemTypeName.LengthItemType | ItemTypeName.MassItemType:
+                decimal_validators.append(validators.MinValueValidator(0))
+                field_kwargs = dict(
+                    max_digits=DECIMAL_MAX_DIGITS,
+                    decimal_places=DECIMAL_PLACES,
+                    validators=decimal_validators,
+                    blank=True, null=True
+                )
+                field_kwargs.update(self.Value_opts)
+                return models.DecimalField(verbose_name, **field_kwargs)
+            case ItemTypeName.PercentItemType:
+                decimal_validators += [validators.MinValueValidator(0), validators.MaxValueValidator(100)]
+                field_kwargs = dict(
+                    max_digits=DECIMAL_MAX_DIGITS,
+                    decimal_places=DECIMAL_PLACES,
+                    validators=decimal_validators,
+                    blank=True, null=True
+                )
+                field_kwargs.update(self.Value_opts)
+                return models.DecimalField(verbose_name, **field_kwargs)
+            case _:
+                field_kwargs = dict(
+                    max_digits=DECIMAL_MAX_DIGITS,
+                    decimal_places=DECIMAL_PLACES,
+                    validators=decimal_validators,
+                    blank=True, null=True
+                )
+                field_kwargs.update(self.Value_opts)
+                return models.DecimalField(verbose_name, **field_kwargs)
 
     def _string_field_by_item_type(self):
         verbose_name = self.verbose_model_field_name(Primitive.Value)
         match self.item_type.name:
-            case 'UUIDItemType':
-                field_kwargs = dict(unique=True, editable=False, default=uuid.uuid4)
+            case ItemTypeName.DateItemType:
+                field_kwargs = dict(blank=True, null=True)
+                field_kwargs.update(self.Value_opts)
+                return models.DateField(verbose_name, **field_kwargs)
+            case ItemTypeName.UUIDItemType:
+                field_kwargs = dict(
+                    unique=True, editable=False, default=uuid.uuid4,
+                    validators=[validators.RegexValidator(regex=re.compile('[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'))]
+                )
                 field_kwargs.update(self.Value_opts)
                 return models.UUIDField(verbose_name, **field_kwargs)
             case _:
@@ -252,7 +314,7 @@ class OBElement:
 
 def json_to_item_type(name: str):
     it = OB_TAXONOMY['x-ob-item-types'][name]
-    kwargs = dict(name=name, description=it['description'])
+    kwargs = dict(name=ItemTypeName(name), description=it['description'])
     match it:
         case {'enums': enums}:
             kwargs['values'] = tuple(Enum(id, v['label'], v['description'])

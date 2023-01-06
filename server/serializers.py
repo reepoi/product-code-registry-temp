@@ -91,12 +91,12 @@ class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
         if self.context['unconfirmed_edits']:
             edits = models.Edit.objects.raw(
                 """
-                SELECT id, server_Edit.Field FROM server_Edit JOIN (
-                    SELECT Field, max(DateSubmitted) as DateSubmitted FROM server_Edit
-                    GROUP BY Field
+                SELECT id, server_Edit.FieldName FROM server_Edit JOIN (
+                    SELECT FieldName, max(DateSubmitted) as DateSubmitted FROM server_Edit
+                    GROUP BY FieldName
                 ) as latest_edits
                 ON server_Edit.DateSubmitted=latest_edits.DateSubmitted
-                AND server_Edit.Field=latest_edits.Field
+                AND server_Edit.FieldName=latest_edits.FieldName
                 WHERE server_Edit.ModelName=%s
                 AND server_Edit.InstanceID=%s
                 AND server_Edit.Status=%s
@@ -108,7 +108,7 @@ class Serializer(serializers.Serializer, metaclass=SerializerMetaclass):
                     models.Edit.TypeChoice.Update.value
                 )
             )
-            self.context['edits'] = {e.Field: e.FieldValue for e in edits}
+            self.context['edits'] = {e.FieldName: e.FieldValue for e in edits}
         return super().to_representation(o)
 
 
